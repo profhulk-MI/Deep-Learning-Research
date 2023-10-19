@@ -1,1 +1,282 @@
+#@title Image Loader
+class img_loader():
+  def __init__(self):
+    Cancer=pd.read_csv('/content/drive/MyDrive/datasets/RINGS dataset/Cancerous_Images.csv')
+    Gland=pd.read_csv('/content/drive/MyDrive/datasets/RINGS dataset/Non_Cancerous_Images.csv')
+    self.cancerous_glands=Cancer.Images.values
+    random.shuffle( self.cancerous_glands)
+    self.non_cancerous_glands=Gland.Images.values
+    random.shuffle(self.non_cancerous_glands)
+    self.train=np.concatenate((self.cancerous_glands[0:400],self.non_cancerous_glands[0:400]))
+
+
+    #Shuffling the dataset to make the dataset homogeneous to both classes
+    self.validation=np.concatenate((self.cancerous_glands[400:],self.non_cancerous_glands[400:493]))
+
+   # ********** IMAGE LOADER **********
+  def load_img(self,img):
+    images=[]
+    angles = [-20, -10, -5, 5, 10, 20]
+    angle = random.choice(angles)
+    for n in img:
+      temp=[]
+      p=patchify(n,(480,480,3),step=480)
+      p=np.reshape(p,(3,3,480,480,3))
+      r=random.random()
+      for i in range(p.shape[0]):
+        for j in range(p.shape[1]):
+          #if r>=0.5:
+          single_patch_img = p[i,j,:,:,:]/255
+          #temp.append(ndimage.rotate(single_patch_img,angle, reshape=False))
+          #else:
+          #single_patch_img = p[i,j,:,:,:]/255
+          temp.append(single_patch_img)
+      images.append(np.asarray(temp).astype(np.float32))
+      #for i in range(p.shape[0]):
+      #  for j in range(p.shape[1]):
+      #    single_patch_img = p[i,j,:,:]/255
+      #    images.append(single_patch_img)
+    X=np.asarray(images).astype(np.float32)
+    return(X)
+
+  def load_img_mask(self,img):
+    images=[]
+    angles = [-20, -10, -5, 5, 10, 20]
+    angle =  random.choice(angles)
+    for n in img:
+      temp=[]
+      p=patchify(n,(480,480,3),step=480)
+      p=np.reshape(p,(3,3,480,480,3))
+      r=random.random()
+      for i in range(p.shape[0]):
+        for j in range(p.shape[1]):
+          #if r>=0.5:
+            #single_patch_img = p[i,j,:,:,:]/255
+            #tsingle_patch_img=ndimage.rotate(single_patch_img,angle, reshape=False))
+          #else:
+            #single_patch_img = p[i,j,:,:,:]/255
+            #temp.append(single_patch_img)
+          #images.append(np.asarray(temp).astype(np.float32))
+          single_patch_img = p[i,j,:,:,:]/255
+          single_patch_img_gray=single_patch_img[:,:,0]
+          single_patch_img_d=np.zeros(shape=np.shape(single_patch_img))
+          single_patch_img_d[:,:,0]=np.where(single_patch_img[:,:,0] == 1, 0, 1) #region
+          contours, hierarchy = cv2.findContours(np.uint8(single_patch_img_gray),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE)
+          tmp = np.zeros_like(single_patch_img)
+          kernel = np.ones((3,3),np.uint8)
+          boundary = cv2.drawContours(tmp, contours, -1, (255,255,255), 1)
+          boundary=np.where(boundary>0,255,0)
+          boundary=cv2.dilate(np.uint8(boundary),kernel,3)
+          boundary[boundary==255]=1
+          single_patch_img_d[:,:,1]=boundary[:,:,0]         #Contour
+          single_patch_img_d[:,:,2]=np.where(single_patch_img[:,:,2] == 0, 1, 0) #Gland
+          temp.append(single_patch_img)
+      images.append(np.asarray(temp).astype(np.float32))
+    X=np.asarray(images).astype(np.float32)
+    return(X)
+
+
+  def imageLoader(self,mode):
+      #mode 1 for train and 2 for validation
+      if mode==1:
+        L = 800
+      #keras needs the generator infinite, so we will use while true
+        while True:
+
+            counter=0
+
+            while counter < L:
+                img=np.random.choice(self.train,2)
+                image=[cv2.imread('/content/drive/MyDrive/datasets/RINGS dataset/TRAIN/IMAGES_NORM/'+i) for i in img] #reading images
+                mask=[cv2.imread('/content/drive/MyDrive/datasets/RINGS dataset/TRAIN/MANUAL_GLANDS/'+i) for i in img]
+                X = self.load_img(image)
+                Y = self.load_img_mask(mask)
+
+                for k in range(2):
+                  yield (X[k],[Y[k],Y[k],Y[k],Y[k]])
+                counter+=1
+      else:
+        L = 50
+        while True:
+            counter=0
+            while counter < L:
+                img=np.random.choice(self.validation,2)
+                image=[cv2.imread('/content/drive/MyDrive/datasets/RINGS dataset/TRAIN/IMAGES_NORM/'+i) for i in img] #reading images
+                mask=[cv2.imread('/content/drive/MyDrive/datasets/RINGS dataset/TRAIN/MANUAL_GLANDS/'+i) for i in img]
+
+                X = self.load_img(image)
+                Y = self.load_img_mask(mask)
+
+                for k in range(2):
+                  yield (X[k],[Y[k],Y[k],Y[k],Y[k]])
+                counter+=1
+
+  def Split(self,img):
+    Gland,tumor=[],[]
+    Gidx,tidx=[],[]
+    try:
+      I=cv2.imread(path_img+'/'+str(img)) #reading images
+      M=cv2.imread(path_mask+'/'+str(img)) #reading masks
+      T=cv2.imread(path_tumor+'/'+str(img))[0:1440,0:1440,:]
+      M[M>=1]=1
+      T[T>=1]=1
+    except Error:
+      I=cv2.imread(test_path_img+'/'+str(img)) #reading images
+      M=cv2.imread(test_path_mask+'/'+str(img)) #reading masks
+      T=cv2.imread(test_path_tumor+'/'+str(img))[0:1440,0:1440,:]
+      M[M>=1]=1
+      T[T>=1]=1
+
+    A=self.imageLoader_test(I)
+    B=self.imageLoader_test(M)
+    C=self.imageLoader_test(T)
+
+    for i in range(9):
+      Gland.append([np.expand_dims(A[i,:,:,:],0),np.expand_dims(B[i,:,:,:],0)])
+      tumor.append([np.expand_dims(A[i,:,:,:],0),np.expand_dims(C[i,:,:,:],0)])
+    #  a=B[i,:,:,0]
+    #  b=C[i,:,:,0]
+    #  a[a>=1]=1
+    #  b[b>=1]=1
+      #L1,L2=len(a[a==0])/np.size(a),len(a[a==1])/np.size(a)
+      #score, diff = structural_similarity(a, b, full=True)
+      #if score>=0.85:
+      #  if len(np.unique(a))>1:
+      #    tumor.append(a)
+      #    tidx.append(i)
+      #elif L2>L1:
+      #  Gland.append(a)
+      #  Gidx.append(i)
+    return  Gland,tumor
+
+  def patched_tumor(self,I,M,T):
+      imagetiles,tumourtiles,glandtiles,output=[],[],[],[]
+      a,b,c,d,e=0,480,0,480,480*480
+      for n,i in enumerate(I):
+        if len(np.unique(T[n]))>1:
+          output.append(1)
+        else:
+          output.append(0)
+        imagetiles.append(i)
+        tumourtiles.append(T[n])
+        glandtiles.append(M[n])
+      return imagetiles,glandtiles,tumourtiles,output
+
+  def imageLoader_(self,img_dir, mask_dir):
+      L = len(img_dir)
+      collection=iter(img_dir)
+      #keras needs the generator infinite, so we will use while true
+      while True:
+        counter=0
+        while counter < L:
+          img=next(collection)
+          Aug_images,Aug_mask=[],[] # List for collecting images
+          try:
+            image=cv2.imread(path_img+'/'+str(img)) #reading images
+            mask=cv2.imread(path_mask+'/'+str(img)) #reading masks
+            mask[mask>=1]=1
+            tumor=cv2.imread(path_tumor+'/'+str(img))
+            tumor[tumor>=1]=1
+          except KeyError:
+            image=cv2.imread(test_path_img+'/'+str(img)) #reading images
+            mask=cv2.imread(test_path_mask+'/'+str(img)) #reading masks
+            tumor=cv2.imread(test_path_tumor+'/'+str(img))
+            tumor[tumor>=1]=1
+            mask[mask>=1]=1
+
+          I,M,T,O=self.patched_tumor(self.load_img_(image),self.load_img_(mask),self.load_img_(tumor))
+          I.extend(I)
+          T.extend(M)
+          O.extend(O)
+          #Aug_images.append(image)
+          #Aug_images.append(cv2.rotate(image,cv2.ROTATE_90_CLOCKWISE))
+          #Aug_images.append(cv2.rotate(image,cv2.ROTATE_180))
+          #Aug_images.append(cv2.rotate(image,cv2.ROTATE_90_COUNTERCLOCKWISE))
+
+          #Aug_mask.append(mask)
+          #Aug_mask.append(cv2.rotate(mask,cv2.ROTATE_90_CLOCKWISE))
+          #Aug_mask.append(cv2.rotate(mask,cv2.ROTATE_180))
+          #Aug_mask.append(cv2.rotate(mask,cv2.ROTATE_90_COUNTERCLOCKWISE))
+
+          #if np.random.normal(5,3,1)<=1:
+          #  Aug_images.append(cv2.vconcat([Aug_images[1][0:720,0:1440,:], Aug_images[2][720:1440,0:1440,:]]))
+          #  Aug_mask.append(cv2.vconcat([Aug_mask[1][0:720,0:1440,:], Aug_mask[2][720:1440,0:1440,:]]))
+
+          X = np.asarray(I)
+          T = np.asarray(T)
+          Y = np.asarray(O)
+
+          for k in range(18):
+            yield (np.expand_dims(X[k],0),np.expand_dims(T[k],0)),np.expand_dims(Y[k],0)
+          counter+=1
+
+  def imageLoader_Dis(self,tumor_glands):
+    L = len(tumor_glands)
+    collection=iter(tumor_glands)
+      #keras needs the generator infinite, so we will use while true
+    while True:
+      counter=0
+      while counter < L:
+        img=np.random.choice(tumor_glands)
+        Class_tumor,Class_Gland=[],[]
+
+        Gland,tumor=self.Split(img) #Getting the gland and tumor patches
+        #Assuming the neither of the two lists are empty
+
+        Class_Gland=[i for i in itertools.combinations_with_replacement(Gland,2)]
+        Class_tumor=[i for i in itertools.combinations_with_replacement(tumor,2)]
+        Combined=[i for i in itertools.combinations(Gland+tumor,2)]
+
+        X,Y=[],[]
+
+        for i in Class_Gland:
+          X.append(i)
+        #Y.append(list(np.ones(len(Class_Gland))))
+        Y=[1]*len(Class_Gland)
+
+        for i in Class_tumor:
+          X.append(i)
+        #Y.extend(list(np.ones(len(Class_tumor))))
+        Y.extend([1]*len(Class_tumor))
+
+        for i in Combined:
+          X.append(i)
+        #Y.extend(list(np.zeros(len(Combined))))
+        Y.extend([0]*len(Combined))
+
+
+        for a,b in zip(X,Y):
+          yield (a,np.expand_dims(np.expand_dims(b,0),0))
+        counter+=1
+
+  def imageLoader_test(self,img):
+    images=[]
+    p=patchify(img,(480,480,3),step=480)
+    p=np.reshape(p,(3,3,480,480,3))
+    for i in range(p.shape[0]):
+        for j in range(p.shape[1]):
+          single_patch_img = p[i,j,:,:]/255
+          images.append(single_patch_img)
+    images=np.array(images).astype(np.float32)
+    return np.asarray(images)
+
+
+
+  def dice_coef(self,y_true, y_pred):
+    y_true_f = np.array(y_true)
+    y_true_f=y_true_f.flatten()
+    y_pred_f = np.array(y_pred)
+    y_pred_f= y_pred_f.flatten()
+    intersection = np.sum(y_true_f * y_pred_f)
+    sums = np.sum(y_true_f, axis=-1) + np.sum(y_pred_f, axis=-1)
+    return (2. * intersection + 0.0000001) / (sums + 0.0000001)
+
+  def iou(self,y_true, y_pred):
+      #SMOOTH = 1e-6
+      #intersection = (y_pred & y_true).sum((1))
+      #union = (y_pred  | y_true).sum((1))
+      #iou = (intersection + SMOOTH) / (union + SMOOTH)
+      #thresholded = np.ceil(np.clip(20 * (iou - 0.7), 0, 10)) / 10
+      return jaccard_score(np.hstack(y_true),np.hstack(y_pred))
+   # ********** IMAGE LOADER ENDS**********
 
