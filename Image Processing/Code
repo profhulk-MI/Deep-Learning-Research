@@ -1,1 +1,191 @@
+#@title Image Processing
+class preprocessing():
+  def __init__(self):
+    self.lumen_mask=None
+    self.nuclei_mask=None
+    self.stroma_mask=None
 
+  #  ******** IMAGE PROCESSSING PART ************
+  def lumen(self,img):
+    img=cv2.cvtColor(np.float32(img), cv2.COLOR_BGR2GRAY)
+    filtered_img = wiener(img, (5, 5))  #Filter the image
+    thre,img=cv2.threshold(filtered_img,200,255,cv2.THRESH_TOZERO_INV)
+    img=cv2.cvtColor(np.uint8(img),cv2.COLOR_BAYER_BG2RGB)
+    self.lumen_mask=img
+    return img
+
+## Generating H&E Images####
+
+  def H_E(self,img):
+    I,al,b,Href,maxCRef=240,1,0.15,np.array([[0.5625,0.2159],[0.7201,0.8012],[0.4062,0.5581]]),np.array([1.9705,1.0308])
+    h, w, c = np.shape(img)
+    img=self.lumen(img)
+    img=np.reshape(img,(-1,3))
+    OD=-np.log10((img.astype(np.float)+0.11)/I)
+    ODhat=OD[~np.any(OD < b,axis=1)]
+    EVal,EVec=np.linalg.eigh(np.cov(ODhat.T))
+
+    Plane=ODhat.dot(EVec[:,1:3])     # Creating a plane based on the largest eigen values of svd
+
+    theta=np.arctan2(Plane[:,1],Plane[:,0])
+    maxtheta=np.percentile(theta,al)
+    mintheta=np.percentile(theta,100-al)
+
+    Vmin=EVec[:,1:3].dot(np.array((np.cos(mintheta),np.sin(mintheta)),dtype=np.float32).T)
+    Vmax=EVec[:,1:3].dot(np.array((np.cos(maxtheta),np.sin(maxtheta)),dtype=np.float32).T)
+
+    if Vmin[0]>Vmax[0]:
+      HE=np.array((Vmin,Vmax),dtype=np.float64).T
+    else:
+      HE=np.array((Vmax,Vmin),dtype=np.float64).T
+
+    Y=np.array(np.reshape(OD,(-1,3)).T,dtype=np.float32)
+    X=[]
+    for i in HE:
+      tmp=[]
+      tmp.extend(i)
+      tmp.append(1)
+      X.append(np.array(tmp,dtype=np.float32))
+
+    C=lstsq(HE,Y)[0]
+
+    maxC=np.array([np.percentile(C[0,:],99),np.percentile(C[1,:],99)])
+    tmp=np.divide(maxC,maxCRef)
+    C2=np.divide(C,tmp[:,np.newaxis])
+
+    Inorm=np.multiply(I,np.exp(-Href.dot(C2)))
+    Inorm[Inorm>255]=254
+    Inorm=np.reshape(Inorm.T,(h,w,3)).astype(np.uint8)
+
+    #Separting hematoxylin and eoslin channel
+    H = np.multiply(I, np.exp(np.expand_dims(-Href[:,0], axis=1).dot(np.expand_dims(C2[0,:], axis=0))))
+    H[H>255] = 254
+    H = np.reshape(H.T, (h, w, 3)).astype(np.uint8)
+
+    E = np.multiply(I, np.exp(np.expand_dims(-Href[:,1], axis=1).dot(np.expand_dims(C2[1,:], axis=0))))
+    E[E>255] = 254
+    E = np.reshape(E.T, (h, w, 3)).astype(np.uint8)
+    return H,E
+
+  def nuclei(self,img):
+    H,E=self.H_E(img)
+    H_Gray=cv2.cvtColor(H, cv2.COLOR_BGR2GRAY)
+    temp=pd.DataFrame(H_Gray)
+    histr = cv2.calcHist([H_Gray],[0],None,[256],[0,256])
+    a=sorted(histr[0:201],reverse=True)[0:15]
+    b=sorted(histr[200:],reverse=True)[0:15]
+    po=[list(histr).index(i) for i in a]
+    p1=[list(histr).index(i) for i in b]
+    varpo=np.var(po)
+    varp1=np.var(p1)
+    En=[([((i**2+varpo+np.log(varpo)+(j**2+varp1+np.log(varp1))),i,j)]) for i,j in zip(po,p1)] # Energy Equation
+    nuclei_pixel=np.min(En,axis=0)[0][-1]
+    H[H>=nuclei_pixel]=255
+    self.nuclei_mask=H
+    return H,E
+
+  def stroma(self,img):
+    hem_ch,eosin_ch=self.nuclei(img)
+    histr = cv2.calcHist(eosin_ch,[0],None,[256],[0,256])
+    tmp=list(histr)
+    min_p=[tmp.index(i) for i in nsmallest(3,tmp)]
+    max_p=[tmp.index(i) for i in nlargest(3,tmp)]
+    centres=np.float32(np.array([min_p,max_p]))
+    a,b,c=np.shape(eosin_ch)
+    E_=np.float32(eosin_ch.reshape((-1,c)))
+    criteria = cv2.TERM_CRITERIA_EPS, 10, 1.0
+    t,self.label,centres=cv2.kmeans(E_,2,None,criteria,10,cv2.KMEANS_RANDOM_CENTERS)
+    self.centres_=np.uint8(centres)
+    res=self.centres_[self.label.flatten()]
+    res2=res.reshape((eosin_ch.shape))
+    self.stroma_mask=res2[:,:,0]
+    return self.stroma_mask
+
+  def Fusion(self,a,img,model):
+    result,ypred_Chan,fusion=[],[],[]
+    #img_=cv2.imread(img)
+    ob=img_loader()
+    stroma_mask=self.stroma(img)
+    stroma_mask=np.array(cv2.cvtColor(stroma_mask[0:1440,0:1440],cv2.COLOR_GRAY2RGB),dtype=np.int32)
+    X=ob.imageLoader_test(img)
+    D1,D2,D3,ypred=model.predict(X)
+    ypred=np.reshape(ypred,(3,3,1,480,480,3))
+    ypred_chan=unpatchify(ypred,(1440,1440,3))
+    region_softmax=np.array(ypred_chan[:,:,:],dtype=np.int32)
+    n=np.mean(region_softmax[:,:,0])
+    region_softmax[:,:,0][region_softmax[:,:,0]>=n]=255
+    region_softmax[:,:,0][region_softmax[:,:,0]<n]=0
+    region_softmax[:,:,1]=np.zeros(shape=(1440,1440))
+    region_softmax[:,:,2]=np.zeros(shape=(1440,1440))
+
+          # Edge
+    edge_softmax=np.array(ypred_chan[:,:,:],dtype=np.int32)
+          #edge_softmax = cv2.cvtColor(edge_softmax,cv2.COLOR_GRAY2RGB)
+    n=np.mean(region_softmax[:,:,1])
+    edge_softmax[:,:,1][edge_softmax[:,:,1]>=n]=255
+    edge_softmax[:,:,1][edge_softmax[:,:,1]<n]=0
+    edge_softmax[:,:,0]=np.zeros(shape=(1440,1440))
+    edge_softmax[:,:,2]=np.zeros(shape=(1440,1440))
+
+    t1 = np.array(cv2.addWeighted(region_softmax,0.5,edge_softmax,0.5,0),dtype=np.int32)
+    fused_img=np.array(cv2.addWeighted(t1,0.5,stroma_mask,0.5,0),dtype=np.int32)
+    tmp1=stroma_mask
+    tmp1=np.where(tmp1>np.mean(tmp1),1,0)
+    tmp1=cv2.Canny(np.uint8(tmp1),0,1)
+    #fused_img=np.where(y[:,:,2]>0.8,1,0)
+    cv = chan_vese(fused_img[:,:,0], mu=0.25, lambda1=1, lambda2=1, tol=1e-3,max_iter=100, dt=0.05, init_level_set=tmp1,extended_output=True)
+    #result, edges=[],[]
+    #for channel in cv2.split(fused_img):
+    #  solver = AmbrosioTortorelliMinimizer(channel, iterations = 1, tol = 0.1, solver_maxiterations = 6)
+    #  f, v = solver.minimize()
+    #  result.append(f)
+    #  edges.append(v)
+    #f = cv2.merge(result)
+    out1=cv[0].astype(int)#print(fused_img)
+    t=cv[0]
+    t=t.reshape((-1,2))
+    #if np.any(np.isnan(t))==True:
+    #  cluster_centers_=[[0.1929845, 0.15966861],
+    #                        [0.31445926, 0.26918203]]
+    #  out=np.where(self.ypred_chan[:,:,2]>np.mean(np.ravel(cluster_centers_)),1,0)
+    #else:
+    clf=KMeans(2).fit(t)
+    #out=np.where(f>np.median(np.ravel(clf.cluster_centers_)),1,0)
+    #print(np.unique(out))
+    #a,out=cv2.threshold(ypred_chan[:,:,0],np.mean(np.ravel(clf.cluster_centers_)),1,cv2.THRESH_BINARY)
+    #cv = chan_vese(fused_img[:,:,0], mu=0.25, lambda1=1, lambda2=1, tol=1e-3,max_iter=40, dt=0.05, init_level_set=tmp1,extended_output=True)
+    #clf=KMeans(2).fit(t)
+    out=np.where(cv[0]>np.median(np.ravel(clf.cluster_centers_)),1,0)
+    kernel1 = np.ones((3,3),np.uint8)
+    kernel2 = np.ones((4,4),np.uint8)
+    kernel3 = np.ones((2,2),np.uint8)
+    out=np.array(out,dtype=np.uint8)
+    out=cv2.erode(out, kernel2, iterations=4)
+    out=cv2.dilate(out,kernel2,iterations=5)
+    out=cv2.erode(out, kernel3, iterations=3)
+    out=cv2.dilate(out, kernel1, iterations=4)
+    out=cv2.erode(out,kernel1,iterations=4)
+    out1=cv2.dilate(out,kernel3,iterations=3)
+    m=cv2.imread('/content/drive/MyDrive/datasets/RINGS dataset/TRAIN/MANUAL_GLANDS_BOUND/'+a)[0:1440,0:1440,0]
+    contours, hierarchy = cv2.findContours(m, cv2.RETR_CCOMP , cv2.CHAIN_APPROX_SIMPLE)
+    hull_list = []
+    for i in range(len(contours)):
+      hull = cv2.convexHull(contours[i])
+      hull_list.append(hull)
+
+    for i in range(len(contours)):
+      cv2.drawContours(out, contours, i, color=(1,1,1))
+      cv2.drawContours(out, hull_list, i, color=(1,1,1))
+      cv2.fillPoly(out, pts =[hull_list[i]], color=(1,1,1))
+      cv2.fillPoly(out, pts =[contours[i]], color=(1,1,1))
+
+    area = [cv2.contourArea(i) for i in contours]
+    nlabels, labels, stats, centroids = cv2.connectedComponentsWithStats(out, None, None, None, 8, cv2.CV_32S)
+    #get CC_STAT_AREA component as stats[label, COLUMN]
+
+    areas = stats[1:,cv2.CC_STAT_AREA]
+    result = np.zeros((labels.shape), np.uint8)
+    for i in range(0, nlabels - 1):
+        if areas[i] >= np.median(area):   #keep
+            result[labels == i + 1] = 1
+    return result,[D1,D2,D3,ypred],out1
