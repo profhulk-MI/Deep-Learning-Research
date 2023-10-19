@@ -1,0 +1,73 @@
+#@title Importing Packages
+import cv2,scipy
+import numpy as np
+from keras.metrics import MeanIoU
+from skimage import morphology
+from sklearn.metrics import jaccard_score
+import random
+from scipy import ndimage
+import itertools
+from skimage.filters import gabor_kernel
+from sklearn.model_selection import train_test_split
+from sklearn.cluster import KMeans
+from skimage.feature import greycomatrix, greycoprops
+import tensorflow as tf
+import warnings
+warnings.filterwarnings("ignore")
+import matplotlib.pyplot as plt
+from scipy import ndimage as ndi
+from heapq import nsmallest,nlargest
+from scipy.linalg import svd
+from scipy.sparse.linalg import LinearOperator
+from scipy.linalg import lstsq
+from sklearn.preprocessing import MinMaxScaler
+from scipy.signal.signaltools import wiener
+import os
+from keras import layers
+from sklearn.utils import shuffle
+import pandas as pd
+from skimage.segmentation import chan_vese
+from patchify import patchify,unpatchify
+from keras.models import load_model
+import tensorflow as tf
+from tensorflow.keras.utils import to_categorical,plot_model
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+scaler = MinMaxScaler()
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+import keras
+from tqdm import tqdm
+from tensorflow.keras.layers import Embedding, Add,Multiply, Dot, Softmax, Lambda, Conv2D, Conv2DTranspose,Activation, BatchNormalization,TimeDistributed,AveragePooling2D,Flatten,Dense,Add,ReLU,LeakyReLU, LSTM
+from tensorflow.keras.layers import ZeroPadding2D,UpSampling2D, Input, Concatenate,Multiply, Lambda, SeparableConv2D,MaxPooling2D,GlobalAveragePooling2D,Dropout
+from keras import regularizers
+from keras import backend as K
+from tensorflow.keras.models import Model
+from tensorflow.keras.regularizers import l2
+from tensorflow.keras.applications import ResNet50, ResNet101,EfficientNetB0,Xception,VGG19,MobileNetV2
+from tensorflow.keras.applications import EfficientNetB7
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from tensorflow.keras.metrics import Recall, Precision, Accuracy, MeanIoU
+from tensorflow.keras import backend as K
+from PIL import Image
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+df=pd.read_csv('/content/drive/MyDrive/datasets/RINGS dataset/Train.csv')
+Train=df.Train
+df1=pd.read_csv('/content/drive/MyDrive/datasets/RINGS dataset/best_results.csv')
+Train_=df1.Train
+
+
+
+input=Input(shape=(480, 480, 3), name="input_image")
+instance1=CNN_Model()
+model=instance1.segmentor(input)
+#model.summary()
+
+for n,layer in enumerate(model.layers):
+  if 0<=n<=145:
+    layer.trainable=False
+  else:
+    layer.trainable=True
+instance1.train()
