@@ -1,0 +1,146 @@
+#@title Model
+class CNN_Model():
+  '''
+  class SupervisedContrastiveLoss(keras.losses.Loss):
+    def __init__(self, temperature=1, name=None):
+        super().__init__(name=name)
+        self.temperature = temperature
+
+    def __call__(self, labels, feature_vectors, sample_weight=None):
+        # Normalize feature vectors
+        feature_vectors_normalized = tf.math.l2_normalize(feature_vectors, axis=1)
+        # Compute logits
+        logits = tf.divide(
+            tf.matmul(
+                feature_vectors_normalized, tf.transpose(feature_vectors_normalized)
+            ),
+            self.temperature,
+        )
+        return tfa.losses.npairs_loss(tf.squeeze(labels), logits)
+
+  '''
+  def loss(self,margin=0.5):
+
+    def contrastive_loss_(ap_distance, an_distance):
+      #y_pred=tf.cast(y_pred,tf.float32)
+      #y_true=tf.cast(y_true,tf.float32)
+      #square_pred = tf.math.square(y_pred)
+      #square_pred=self.euclidean_distance([y_true,y_pred])
+      #square_pred = tf.math.square(y_pred)
+      #margin_square = tf.math.square(tf.math.maximum(margin - (y_pred), 0))
+      #return tf.math.reduce_mean(
+      #      (1 - y_true) * square_pred + (y_true) * margin_square)
+      #y_pred = tf.convert_to_tensor(y_pred)
+      #y_true = tf.dtypes.cast(y_true, y_pred.dtype)
+      #return y_true * tf.math.square(y_pred) + (1.0 - y_true) * tf.math.square(
+      #  tf.math.maximum(margin - y_pred, 0.0)
+
+      loss = tf.math.subtract(ap_distance , an_distance)
+      loss = tf.maximum(loss + margin, 0.0)
+      return loss
+
+
+    return contrastive_loss_
+
+  def contrastive_loss(self,ap_distance, an_distance):
+
+      loss = ap_distance - an_distance
+      loss = tf.maximum(loss + 0.5, 0.0)
+      return loss
+
+  def euclidean_distance(self,vects):
+
+    x, y = vects
+    sum_square = tf.math.reduce_sum(tf.math.square(x - y), axis=1, keepdims=True)
+    return tf.math.sqrt(tf.math.maximum(sum_square, tf.keras.backend.epsilon()))
+
+  def Discriminator(self,input_1):
+    Efficient=ResNet101V2(include_top=False,weights="imagenet",
+    input_tensor=input_1,
+    input_shape=None,
+    pooling=None,
+    classes=1000)
+    #Efficient.summary()
+    for layer in Efficient.layers[:-100]:
+      layer.trainable = False
+    #post_relu resnet101v2 conv5_block3_out EfficientNetB7 top_activation Xception block14_sepconv2_act
+    x = Flatten(name="flatten")(Efficient.get_layer('post_relu').output)
+    x = BatchNormalization() (x)
+    x = Dense(512, activation="relu", name="layer1")(x)
+    x = BatchNormalization() (x)
+    x = Dropout(0.5) (x)
+    x = Dense(512, activation="relu", name="layer2")(x)
+    x = BatchNormalization() (x)
+    x = Dropout(0.3) (x)
+    x = Dense(64, activation="sigmoid", name="layer3")(x)
+    self.ResModel = training.Model(input_1, x,)
+
+  def Contrastive(self,input_1,input_2,input_3):
+    #input_1,input_2=input
+    self.Discriminator(input_1)
+
+    femodel1=tf.cast(self.ResModel(input_1),tf.float32) #anchor
+    femodel2=tf.cast(self.ResModel(input_2),tf.float32) #positive
+    femodel3=tf.cast(self.ResModel(input_3),tf.float32) #negative
+    #y=Input(shape=(1))
+    #merge_layer = Dot(1,normalize=True) ([femodel1,femodel2])
+    ED_AP= Lambda(self.euclidean_distance)([femodel1,femodel2])
+    ED_AN= Lambda(self.euclidean_distance)([femodel1,femodel3])
+    #loss_layer= self.contrastive_loss(ED_AP,ED_AN)
+    #normal_layer = BatchNormalization(name='normal')(merge_layer)
+    #output_layer = Dense(1, activation="sigmoid",name='last')(normal_layer)
+    #self.siamese = Model(inputs=[(input_1, input_2),y], outputs=output_layer)
+    self.Siamese_model = Model(inputs=[input_1,input_2,input_3], outputs=(ED_AP,ED_AN))
+    self.Siamese_model.compile(loss=self.loss(margin=1), optimizer=tf.keras.optimizers.Adam(0.0001))
+    #self.siamese.summary()
+    print('Siamese Net Build')
+
+
+  def Final(self,input):
+    x = self.ResModel(input)
+    x = Flatten() (x)
+    x=Dense(8,'sigmoid',name='dense8_')(x)
+    Dropout(0.5)(x)
+    x4=Dense(3,'softmax',name='dense11_')(x)
+    self.finalmodel=Model(inputs=input,outputs=x4)
+
+  def train_Siamese(self,):
+    imgloader_train=img_loader_Siamese()
+    imgloader_valid=img_loader_Siamese()
+    step_p_ep=5000
+    checkpoint_path = "/content/drive/MyDrive/datasets/Conference/Meta/weights/Sia_Brain_Cont{epoch:02d}.h5"
+    def scheduler(epoch, lr):
+      if epoch < 5:
+        return lr
+      else:
+        return lr * tf.math.exp(-0.1)
+    cp_callback = [
+                 #tf.keras.callbacks.LearningRateScheduler(scheduler),
+                 tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,save_best_only=True,verbose=1),
+                 #tf.keras.callbacks.EarlyStopping(monitor='loss', patience=10),
+                 tf.keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.2,patience=3, min_lr=0.000000000000000000000000001),
+                 tf.keras.callbacks.TensorBoard(log_dir="./logs")
+                 ]
+    self.Siamese_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.00001),loss=self.loss())
+    history=self.Siamese_model.fit((imgloader_train.imageLoader(mode=0)),validation_data=imgloader_valid.imageLoader(mode=1),validation_steps=100,epochs=50,steps_per_epoch=100,callbacks=[cp_callback])
+
+
+  def train_Discriminant(self):
+    imgloader_train=img_loader()
+    imgloader_valid=img_loader()
+    step_p_ep=5000
+    checkpoint_path = "/content/drive/MyDrive/datasets/Conference/Meta/weights/Brain_Cont{epoch:02d}.h5"
+    def scheduler(epoch, lr):
+      if epoch < 5:
+        return lr
+      else:
+        return lr * tf.math.exp(-0.1)
+    cp_callback = [
+                 #tf.keras.callbacks.LearningRateScheduler(scheduler),
+                 tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,save_best_only=True,verbose=1),
+                 #tf.keras.callbacks.EarlyStopping(monitor='loss', patience=30),
+                 tf.keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.2,patience=3, min_lr=0.00000000000001),
+                 tf.keras.callbacks.TensorBoard(log_dir="./logs")
+                 ]
+    self.finalmodel.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),loss=tf.keras.losses.SparseCategoricalCrossentropy(),metrics=[keras.metrics.SparseCategoricalAccuracy()])
+    history=self.finalmodel.fit((imgloader_train.imageLoader(mode=0)),validation_data=imgloader_valid.imageLoader(mode=1),validation_steps=100,epochs=50,steps_per_epoch=100,callbacks=[cp_callback])
