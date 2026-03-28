@@ -1,0 +1,11 @@
+#@title Visulization Train Layer Projection
+import seaborn as sns
+train_labels=[]
+projected_1=np.matmul(proj_1[0],projector_1)
+for i in train_files:
+  if 'acute' in i:
+    train_labels.append('acute')
+  else:
+    train_labels.append('normal')
+plt.figure(figsize=(8,6))
+sns.scatterplot(x=projected_1[:,0],y=projected_1[:,1],hue=train_labels,palette='flare')
