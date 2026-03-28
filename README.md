@@ -1,6 +1,6 @@
 <table>
   <tr>
-    <td width="60%">
+    <td width="50%">
 
 ## Self-Supervised Learning for Stroke Cause Analysis 
 - The procedure for determining the cause for strokes makes heavy use of computed tomographic (CT) images. 
@@ -12,7 +12,7 @@ The results are tested against different DL models for better generality with th
 We also compare the results based on different levels of refinement based on their architecture. We feel this is the first study on such approach applied to this domain.
 
  </td>
-    <td width="40%">
+    <td width="50%">
       <img src="Picture2.png" width="100%"/>
     </td>
   </tr>
