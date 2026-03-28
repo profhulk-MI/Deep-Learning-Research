@@ -16,7 +16,7 @@ A Novel Attention-Based Model for Semantic Segmentation of Prostate Glands Using
 
  </td>
     <td width="40%">
-      <img src="Images/info.png" width="100%"/>
+      <img src="info.png" width="100%"/>
       <img src="Images/Fig 8 new new.jpg" width="100%"/>
     </td>
   </tr>
