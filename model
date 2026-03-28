@@ -1,0 +1,364 @@
+#@title Importing Packages
+!pip install tensorflow_addons
+!pip install patchify
+!pip install positional_encodings
+import cv2,scipy
+import random
+from scipy import ndimage
+import natsort
+from natsort import natsorted
+from patchify import patchify, unpatchify
+import numpy as np
+from keras.applications import imagenet_utils
+import tensorflow_addons as tfa
+from keras.engine import training
+from keras.layers import VersionAwareLayers
+from keras.utils import data_utils
+from keras.utils import layer_utils
+import pickle
+from skimage.filters import gabor_kernel
+from sklearn.model_selection import train_test_split
+from sklearn.cluster import KMeans
+from skimage.feature import greycomatrix, greycoprops
+import tensorflow as tf
+from tensorflow.keras import regularizers
+import warnings
+warnings.filterwarnings("ignore")
+import matplotlib.pyplot as plt
+from scipy import ndimage as ndi
+from heapq import nsmallest,nlargest
+from scipy.linalg import svd
+from scipy.sparse.linalg import LinearOperator
+from positional_encodings.tf_encodings import TFPositionalEncoding3D, TFSummer
+from scipy.linalg import lstsq
+from sklearn.preprocessing import MinMaxScaler
+from scipy.signal.signaltools import wiener
+import os
+from keras import layers
+from keras import backend
+from sklearn.utils import shuffle
+import pandas as pd
+from skimage.segmentation import chan_vese
+from keras.models import load_model
+import tensorflow as tf
+from tensorflow.keras.utils import to_categorical,plot_model
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+scaler = MinMaxScaler()
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+import keras
+from tqdm import tqdm
+from tensorflow.keras.layers import Dense,Add,Conv3D,MaxPool3D,GlobalAveragePooling3D,GlobalMaxPooling3D,Embedding, Activation,Add,Multiply, Dot, Softmax, Lambda, Conv2D, Conv2DTranspose,Activation, BatchNormalization,TimeDistributed,AveragePooling2D,Flatten,Dense,Add,ReLU, LSTM
+from tensorflow.keras.layers import ZeroPadding2D,UpSampling2D, MaxPool3D,Input, Concatenate,Multiply,LayerNormalization, Lambda, SeparableConv2D,MaxPooling2D,GlobalMaxPooling2D,GlobalAveragePooling2D,Dropout
+from keras import backend as K
+from tensorflow.keras.models import Model
+from tensorflow.keras.regularizers import l2
+from tensorflow.keras.applications import ResNet50, ResNet101,EfficientNetB7,Xception,VGG19,MobileNetV2,ResNet101V2
+from tensorflow.keras.applications import EfficientNetB7
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from tensorflow.keras.metrics import Recall, Precision, Accuracy
+from tensorflow.keras import backend as K
+from PIL import Image
+from tensorflow.python.util.tf_export import keras_export
+
+BASE_WEIGHTS_PATH = (
+    "https://storage.googleapis.com/tensorflow/keras-applications/resnet/"
+)
+
+WEIGHTS_HASHES = {
+    "resnet101": (
+        "f1aeb4b969a6efcfb50fad2f0c20cfc5",
+        "88cf7a10940856eca736dc7b7e228a21",
+    ),
+}
+
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+#@title Simplistic refinement of Feature Representations using Contrastive Learning Model
+class CNN_Model():
+  '''
+  class SupervisedContrastiveLoss(keras.losses.Loss):
+    def __init__(self, temperature=1, name=None):
+        super().__init__(name=name)
+        self.temperature = temperature
+
+    def __call__(self, labels, feature_vectors, sample_weight=None):
+        # Normalize feature vectors
+        feature_vectors_normalized = tf.math.l2_normalize(feature_vectors, axis=1)
+        # Compute logits
+        logits = tf.divide(
+            tf.matmul(
+                feature_vectors_normalized, tf.transpose(feature_vectors_normalized)
+            ),
+            self.temperature,
+        )
+        return tfa.losses.npairs_loss(tf.squeeze(labels), logits)
+
+  '''
+  def loss(self,margin=0.5):
+
+    def contrastive_loss_(ap_distance, an_distance):
+      #y_pred=tf.cast(y_pred,tf.float32)
+      #y_true=tf.cast(y_true,tf.float32)
+      #square_pred = tf.math.square(y_pred)
+      #square_pred=self.euclidean_distance([y_true,y_pred])
+      #square_pred = tf.math.square(y_pred)
+      #margin_square = tf.math.square(tf.math.maximum(margin - (y_pred), 0))
+      #return tf.math.reduce_mean(
+      #      (1 - y_true) * square_pred + (y_true) * margin_square)
+      #y_pred = tf.convert_to_tensor(y_pred)
+      #y_true = tf.dtypes.cast(y_true, y_pred.dtype)
+      #return y_true * tf.math.square(y_pred) + (1.0 - y_true) * tf.math.square(
+      #  tf.math.maximum(margin - y_pred, 0.0)
+
+      loss = tf.math.subtract(ap_distance , an_distance)
+      loss = tf.maximum(loss + margin, 0.0)
+      return loss
+
+
+    return contrastive_loss_
+
+  def contrastive_loss(self,ap_distance, an_distance):
+
+      loss = ap_distance - an_distance
+      loss = tf.maximum(loss + 0.5, 0.0)
+      return loss
+
+  def euclidean_distance(self,vects):
+
+    x, y = vects
+    sum_square = tf.math.reduce_sum(tf.math.square(x - y), axis=1, keepdims=True)
+    return tf.math.sqrt(tf.math.maximum(sum_square, tf.keras.backend.epsilon()))
+
+
+  def VGG16(self,include_top=False,img_input=input,weights='imagenet',input_tensor=None,input_shape=None,pooling=None,classes=1000, classifier_activation="sparse_categorical_crossentropy",):
+    if weights == "imagenet" and include_top and classes != 1000:
+        raise ValueError(
+            'If using `weights` as `"imagenet"` with `include_top` '
+            "as true, `classes` should be 1000.  "
+            f"Received `classes={classes}`"
+        )
+    WEIGHTS_PATH = (
+    "https://storage.googleapis.com/tensorflow/keras-applications/"
+    "vgg16/vgg16_weights_tf_dim_ordering_tf_kernels.h5")
+    WEIGHTS_PATH_NO_TOP = (
+    "https://storage.googleapis.com/tensorflow/"
+    "keras-applications/vgg16/"
+    "vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5")
+
+    layers = VersionAwareLayers()
+    input_shape=512,512,3
+    '''
+    input_shape = imagenet_utils.obtain_input_shape(
+        input_shape,
+        default_size=512,
+        min_size=32,
+        data_format=backend.image_data_format(),
+        require_flatten=include_top,
+        weights=weights,
+    )
+    '''
+    if input_tensor is None:
+       img_input = layers.Input(shape=input_shape)
+    else:
+       if not backend.is_keras_tensor(input_tensor):
+         img_input = layers.Input(tensor=input_tensor, shape=input_shape)
+       else:
+         img_input = input_tensor
+    if input_tensor is not None:
+        inputs = layer_utils.get_source_inputs(input_tensor)
+    else:
+        inputs = img_input
+    # Block 1
+    x = layers.Conv2D(
+          64, (3, 3), activation="relu", padding="same", name="block1_conv1"
+      )(img_input)
+    x = layers.Conv2D(
+          64, (3, 3), activation="relu", padding="same", name="block1_conv2"
+      )(x)
+    x = layers.MaxPooling2D((2, 2), strides=(2, 2), name="block1_pool")(x)
+
+      # Block 2
+    x = layers.Conv2D(
+          128, (3, 3), activation="relu", padding="same", name="block2_conv1"
+      )(x)
+    x = layers.Conv2D(
+          128, (3, 3), activation="relu", padding="same", name="block2_conv2"
+      )(x)
+    x = layers.MaxPooling2D((2, 2), strides=(2, 2), name="block2_pool")(x)
+
+      # Block 3
+    x = layers.Conv2D(
+          256, (3, 3), activation="relu", padding="same", name="block3_conv1"
+      )(x)
+    x = layers.Conv2D(
+          256, (3, 3), activation="relu", padding="same", name="block3_conv2"
+      )(x)
+    x = layers.Conv2D(
+          256, (3, 3), activation="relu", padding="same", name="block3_conv3"
+      )(x)
+    x = layers.MaxPooling2D((2, 2), strides=(2, 2), name="block3_pool")(x)
+
+      # Block 4
+    x = layers.Conv2D(
+          512, (3, 3), activation="relu", padding="same", name="block4_conv1"
+      )(x)
+    x = layers.Conv2D(
+          512, (3, 3), activation="relu", padding="same", name="block4_conv2"
+      )(x)
+    x = layers.Conv2D(
+          512, (3, 3), activation="relu", padding="same", name="block4_conv3"
+      )(x)
+    x = layers.MaxPooling2D((2, 2), strides=(2, 2), name="block4_pool")(x)
+
+      # Block 5
+    x = layers.Conv2D(
+          512, (3, 3), activation="relu", padding="same", name="block5_conv1"
+      )(x)
+    x = layers.Conv2D(
+          512, (3, 3), activation="relu", padding="same", name="block5_conv2"
+      )(x)
+    x = layers.Conv2D(
+          512, (3, 3), activation="relu", padding="same", name="block5_conv3"
+      )(x)
+    x = layers.MaxPooling2D((2, 2), strides=(2, 2), name="block5_pool")(x)
+
+    #if include_top:
+          # Classification block
+
+    x = layers.Flatten(name="flatten")(x)
+    x = BatchNormalization() (x)
+    x = layers.Dense(512, activation="relu", name="layer1")(x)
+    x = BatchNormalization() (x)
+    x = Dropout(0.5) (x)
+    x = layers.Dense(512, activation="relu", name="layer2")(x)
+    x = BatchNormalization() (x)
+    x = Dropout(0.3) (x)
+    x = layers.Dense(64, activation="sigmoid", name="layer3")(x)
+    self.VGG_Model = training.Model(inputs, x, name="vgg16")
+    # Load weights.
+    if weights == "imagenet":
+      if include_top:
+              weights_path = data_utils.get_file(
+                  "vgg16_weights_tf_dim_ordering_tf_kernels.h5",
+                  WEIGHTS_PATH,
+                  cache_subdir="models",
+                  file_hash="64373286793e3c8b2b4e3219cbf3544b",
+              )
+      else:
+              weights_path = data_utils.get_file(
+                  "vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5",
+                  WEIGHTS_PATH_NO_TOP,
+                  cache_subdir="models",
+                  file_hash="6d6bbae143d832006294945121d1f1fc",
+              )
+      self.VGG_Model.load_weights(weights_path,by_name=True)
+    elif weights is not None:
+          self.VGG_Model.load_weights(weights,by_name=True)
+
+  def Discriminator(self,input_1):
+    Efficient=ResNet101V2(include_top=False,weights="imagenet",
+    input_tensor=input_1,
+    input_shape=None,
+    pooling=None,
+    classes=1000)
+    #Efficient.summary()
+    for layer in Efficient.layers[:-100]:
+      layer.trainable = False
+    #post_relu resnet101v2 conv5_block3_out EfficientNetB7 top_activation Xception block14_sepconv2_act
+    x = Flatten(name="flatten")(Efficient.get_layer('post_relu').output)
+    x = BatchNormalization() (x)
+    x = Dense(512, activation="relu", name="layer1")(x)
+    x = BatchNormalization() (x)
+    x = Dropout(0.5) (x)
+    x = Dense(512, activation="relu", name="layer2")(x)
+    x = BatchNormalization() (x)
+    x = Dropout(0.3) (x)
+    x = Dense(64, activation="sigmoid", name="layer3")(x)
+    self.ResModel = training.Model(input_1, x,)
+
+  def Contrastive(self,input_1,input_2,input_3):
+    #input_1,input_2=input
+    self.Discriminator(input_1)
+
+    femodel1=tf.cast(self.ResModel(input_1),tf.float32) #anchor
+    femodel2=tf.cast(self.ResModel(input_2),tf.float32) #positive
+    femodel3=tf.cast(self.ResModel(input_3),tf.float32) #negative
+    #y=Input(shape=(1))
+    #merge_layer = Dot(1,normalize=True) ([femodel1,femodel2])
+    ED_AP= Lambda(self.euclidean_distance)([femodel1,femodel2])
+    ED_AN= Lambda(self.euclidean_distance)([femodel1,femodel3])
+    #loss_layer= self.contrastive_loss(ED_AP,ED_AN)
+    #normal_layer = BatchNormalization(name='normal')(merge_layer)
+    #output_layer = Dense(1, activation="sigmoid",name='last')(normal_layer)
+    #self.siamese = Model(inputs=[(input_1, input_2),y], outputs=output_layer)
+    self.Siamese_model = Model(inputs=[input_1,input_2,input_3], outputs=(ED_AP,ED_AN))
+    self.Siamese_model.compile(loss=self.loss(margin=1), optimizer=tf.keras.optimizers.Adam(0.0001))
+    #self.siamese.summary()
+    print('Siamese Net Build')
+
+
+  def Final(self,input):
+    x = self.ResModel(input)
+    x = Flatten() (x)
+    x=Dense(8,'sigmoid',name='dense8_')(x)
+    Dropout(0.5)(x)
+    x4=Dense(3,'softmax',name='dense11_')(x)
+    self.finalmodel=Model(inputs=input,outputs=x4)
+
+  def train_Siamese(self,):
+    imgloader_train=img_loader_Siamese()
+    imgloader_valid=img_loader_Siamese()
+    step_p_ep=5000
+    checkpoint_path = "/content/drive/MyDrive/datasets/Conference/Meta/weights/Sia_Brain_Cont{epoch:02d}.h5"
+    def scheduler(epoch, lr):
+      if epoch < 5:
+        return lr
+      else:
+        return lr * tf.math.exp(-0.1)
+    cp_callback = [
+                 #tf.keras.callbacks.LearningRateScheduler(scheduler),
+                 tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,save_best_only=True,verbose=1),
+                 #tf.keras.callbacks.EarlyStopping(monitor='loss', patience=10),
+                 tf.keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.2,patience=3, min_lr=0.000000000000000000000000001),
+                 tf.keras.callbacks.TensorBoard(log_dir="./logs")
+                 ]
+    self.Siamese_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.00001),loss=self.loss())
+    history=self.Siamese_model.fit((imgloader_train.imageLoader(mode=0)),validation_data=imgloader_valid.imageLoader(mode=1),validation_steps=100,epochs=50,steps_per_epoch=100,callbacks=[cp_callback])
+
+
+  def train_Discriminant(self):
+    imgloader_train=img_loader()
+    imgloader_valid=img_loader()
+    step_p_ep=5000
+    checkpoint_path = "/content/drive/MyDrive/datasets/Conference/Meta/weights/Brain_Cont{epoch:02d}.h5"
+    def scheduler(epoch, lr):
+      if epoch < 5:
+        return lr
+      else:
+        return lr * tf.math.exp(-0.1)
+    cp_callback = [
+                 #tf.keras.callbacks.LearningRateScheduler(scheduler),
+                 tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,save_best_only=True,verbose=1),
+                 #tf.keras.callbacks.EarlyStopping(monitor='loss', patience=30),
+                 tf.keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.2,patience=3, min_lr=0.00000000000001),
+                 tf.keras.callbacks.TensorBoard(log_dir="./logs")
+                 ]
+    self.finalmodel.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),loss=tf.keras.losses.SparseCategoricalCrossentropy(),metrics=[keras.metrics.SparseCategoricalAccuracy()])
+    history=self.finalmodel.fit((imgloader_train.imageLoader(mode=0)),validation_data=imgloader_valid.imageLoader(mode=1),validation_steps=100,epochs=50,steps_per_epoch=100,callbacks=[cp_callback])
+
+#@title Initilization and train
+inputs1=tf.keras.Input(shape=(512,512,3))
+inputs2=tf.keras.Input(shape=(512,512,3))
+inputs3=tf.keras.Input(shape=(512,512,3))
+instance=CNN_Model()
+instance.Contrastive(inputs1,inputs2,inputs3)
+instance.Final(inputs1)
+instance.Discriminator(inputs1)
+#for layers in instance.ResModel.layers[:-100]:
+#  layers.trainable=False
+#instance.train_Siamese()
+#instance.Siamese_model.load_weights('/content/drive/MyDrive/datasets/Conference/Meta/weights/Brain_Cont03.h5',by_name=True)
+#instance.finalmodel.load_weights('/content/drive/MyDrive/datasets/Conference/Meta/weights/Brain_Cont28.h5',by_name=True)
