@@ -13,7 +13,7 @@ We also compare the results based on different levels of refinement based on the
 
  </td>
     <td width="40%">
-      <img src="Picture1.png" width="100%"/>
+      <img src="Picture2.png" width="100%"/>
     </td>
   </tr>
 </table>
