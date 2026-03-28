@@ -1,0 +1,99 @@
+#@title Image Loader Contrastive
+class img_loader_Siamese():
+  def array_con(self,a,t):
+    if np.shape(a)!=(512,512,3):
+      if t=='acute':
+        return np.asarray(cv2.convertScaleAbs(cv2.imread('/content/drive/MyDrive/datasets/Conference/Train/acute231.jpg'),alpha=2,beta=0)).astype('float32')
+      elif t=='chronic':
+        return np.asarray(cv2.convertScaleAbs(cv2.imread('/content/drive/MyDrive/datasets/Conference/Train/chronic165.jpg'),alpha=2,beta=0)).astype('float32')
+      elif t=='normal':
+         return np.asarray(cv2.convertScaleAbs(cv2.imread('/content/drive/MyDrive/datasets/Conference/Train/normal396.jpg'),alpha=2,beta=0)).astype('float32')
+    else:
+      return np.asarray(cv2.convertScaleAbs(a,alpha=2,beta=0)).astype('float32')
+
+  def imageLoader(self,mode):
+    path='/content/drive/MyDrive/datasets/Conference_1'
+
+    #Mode here is to figure out what is code running for Train, Validation or Test
+    list_of_class=['Train','Validation','Test']
+    finalpath=path+'/'+list_of_class[mode]
+
+    #n=list(os.listdir(finalpath))
+
+    #keras needs the generator infinite, so we will use while true
+    if mode==0:
+      acute=[i for i in list(os.listdir(finalpath)) if 'acute' in i]
+      normal=[i for i in list(os.listdir(finalpath)) if 'normal' in i]
+      while True:
+        Aug_images=[]
+        Labels=[1,1,1,0,0,0]
+        Aug_images.append([self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute'),
+                          self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute'),
+                          self.array_con(cv2.imread(finalpath+'/'+'normal/'+np.random.choice(normal,1)[0]),'normal')])
+
+        Aug_images.append([self.array_con(cv2.imread(finalpath+'/'+'normal'+np.random.choice(normal,1)[0]),'normal'),
+                          self.array_con(cv2.imread(finalpath+'/'+'normal/'+np.random.choice(normal,1)[0]),'normal'),
+                          self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute')])
+
+        Aug_images.append([self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute'),
+                          self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute'),
+                          self.array_con(cv2.imread(finalpath+'/'+'normal/'+np.random.choice(normal,1)[0]),'normal')])
+
+        Aug_images.append([self.array_con(cv2.imread(finalpath+'/'+'normal/'+np.random.choice(acute,1)[0]),'normal'),
+                          self.array_con(cv2.imread(finalpath+'/'+'normal/'+np.random.choice(acute,1)[0]),'normal'),
+                          self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute')])
+
+        Aug_images.append([self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute'),
+                          self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute'),
+                          self.array_con(cv2.imread(finalpath+'/'+'normal/'+np.random.choice(normal,1)[0]),'normal')])
+
+        Aug_images.append([self.array_con(cv2.imread(finalpath+'/'+'normal/'+np.random.choice(normal,1)[0]),'normal'),
+                          self.array_con(cv2.imread(finalpath+'/'+'normal/'+np.random.choice(normal,1)[0]),'normal'),
+                          self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute')])
+
+
+        X = Aug_images
+        Y = Labels
+        for k in range(np.shape(X)[0]):
+          yield ((np.expand_dims(np.array(X[k][0]).astype('float32'),0),
+                  np.expand_dims(np.array(X[k][1]).astype('float32'),0),
+                  np.expand_dims(np.array(X[k][2]).astype('float32'),0)),
+                  np.expand_dims(np.array(Y[k]).astype('float32'),0))
+
+    else:
+      acute=[i for i in list(os.listdir(finalpath)) if 'acute' in i]
+      normal=[i for i in list(os.listdir(finalpath)) if 'normal' in i]
+      while True:
+        Aug_images=[]
+        Labels=[1,1,1,0,0,0]
+        Aug_images.append([self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute'),
+                          self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute'),
+                          self.array_con(cv2.imread(finalpath+'/'+'normal/'+np.random.choice(normal,1)[0]),'normal')])
+
+        Aug_images.append([self.array_con(cv2.imread(finalpath+'/'+'normal'+np.random.choice(normal,1)[0]),'normal'),
+                          self.array_con(cv2.imread(finalpath+'/'+'normal/'+np.random.choice(normal,1)[0]),'normal'),
+                          self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute')])
+
+        Aug_images.append([self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute'),
+                          self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute'),
+                          self.array_con(cv2.imread(finalpath+'/'+'normal/'+np.random.choice(normal,1)[0]),'normal')])
+
+        Aug_images.append([self.array_con(cv2.imread(finalpath+'/'+'normal/'+np.random.choice(acute,1)[0]),'normal'),
+                          self.array_con(cv2.imread(finalpath+'/'+'normal/'+np.random.choice(acute,1)[0]),'normal'),
+                          self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute')])
+
+        Aug_images.append([self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute'),
+                          self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute'),
+                          self.array_con(cv2.imread(finalpath+'/'+'normal/'+np.random.choice(normal,1)[0]),'normal')])
+
+        Aug_images.append([self.array_con(cv2.imread(finalpath+'/'+'normal/'+np.random.choice(normal,1)[0]),'normal'),
+                          self.array_con(cv2.imread(finalpath+'/'+'normal/'+np.random.choice(normal,1)[0]),'normal'),
+                          self.array_con(cv2.imread(finalpath+'/'+'acute/'+np.random.choice(acute,1)[0]),'acute')])
+
+        X = Aug_images
+        Y = Labels
+        for k in range(np.shape(X)[0]):
+            yield ((np.expand_dims(np.array(X[k][0]).astype('float32'),0),
+                  np.expand_dims(np.array(X[k][1]).astype('float32'),0),
+                  np.expand_dims(np.array(X[k][2]).astype('float32'),0)),
+                  np.expand_dims(np.array(Y[k]).astype('float32'),0))
