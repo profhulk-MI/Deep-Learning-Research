@@ -1,3 +1,8 @@
+<table>
+  <tr>
+    <td width="60%">
+
+
 # Semantic-Segmentation-of-Prostate-Glands-Using-Histopathological-Images
 A Novel Attention-Based Model for Semantic Segmentation of Prostate Glands Using Histopathological Images
 
@@ -9,3 +14,11 @@ We compare our results with a host of contemporary techniques and show that our 
 
 
 Please cite here: M. A. Inamdar et al., "A Novel Attention-Based Model for Semantic Segmentation of Prostate Glands Using Histopathological Images," in IEEE Access, vol. 11, pp. 108982-108994, 2023, doi: 10.1109/ACCESS.2023.3321273.
+
+ </td>
+    <td width="40%">
+      <img src="Picture1.png" width="100%"/>
+    </td>
+  </tr>
+</table>
+
